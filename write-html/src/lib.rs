@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use write_scope::{
     xml::{self, Element},
-    Write,
+    Open,
 };
 
 pub trait HtmlElement: xml::Element {
@@ -65,7 +65,7 @@ pub struct A<S> {
 impl<S: Display> Element for A<S> {
     const TAG: &str = "a";
 
-    fn tag_and_attributes<W: Write>(self, mut w: W) -> Result<(), W::Error> {
+    fn tag_and_attributes<W: Open>(self, mut w: W) -> Result<(), W::Error> {
         write!(w, "a href={}", self.href)
     }
 }
@@ -77,7 +77,7 @@ pub struct Img<S> {
 impl<S: AsRef<str>> Element for Img<S> {
     const TAG: &str = "img";
 
-    fn tag_and_attributes<W: Write>(self, mut w: W) -> Result<(), W::Error> {
+    fn tag_and_attributes<W: Open>(self, mut w: W) -> Result<(), W::Error> {
         write!(w, "img src={}", self.src.as_ref())
     }
 }
@@ -91,7 +91,7 @@ pub struct Attr<K, V, E> {
 impl<K: AsRef<str>, V: Display, E: Element> Element for Attr<K, V, E> {
     const TAG: &str = E::TAG;
 
-    fn tag_and_attributes<W: Write>(self, mut w: W) -> Result<(), W::Error> {
+    fn tag_and_attributes<W: Open>(self, mut w: W) -> Result<(), W::Error> {
         self.inner.tag_and_attributes(&mut w)?;
         write!(w, " {}=\"{}\"", self.key.as_ref(), self.val)
     }
@@ -105,7 +105,7 @@ pub struct Id<V, E> {
 impl<V: AsRef<str>, E: Element> Element for Id<V, E> {
     const TAG: &str = E::TAG;
 
-    fn tag_and_attributes<W: Write>(self, mut w: W) -> Result<(), W::Error> {
+    fn tag_and_attributes<W: Open>(self, mut w: W) -> Result<(), W::Error> {
         self.inner.tag_and_attributes(&mut w)?;
         write!(w, " id=\"{}\"", self.val.as_ref())
     }
@@ -119,7 +119,7 @@ pub struct Class<V, E> {
 impl<V: AsRef<str>, E: Element> Element for Class<V, E> {
     const TAG: &str = E::TAG;
 
-    fn tag_and_attributes<W: Write>(self, mut w: W) -> Result<(), W::Error> {
+    fn tag_and_attributes<W: Open>(self, mut w: W) -> Result<(), W::Error> {
         self.inner.tag_and_attributes(&mut w)?;
         write!(w, " class=\"{}\"", self.val.as_ref())
     }
