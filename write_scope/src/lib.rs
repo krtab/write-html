@@ -1,4 +1,10 @@
-use std::{
+
+//! A no-std able crate to handle scopes (like xml/html) that should be closed when writing, 
+//! with no allocation.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+use core::{
     fmt::{self, Display},
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -6,10 +12,15 @@ use std::{
     ptr,
 };
 
+#[cfg(feature = "std")]
+mod with_std;
+#[cfg(feature = "std")]
+pub use with_std::WrapIO;
+
 pub struct WrapFmt<W>(W);
 
-impl<W: std::fmt::Write> Open for WrapFmt<W> {
-    type Error = std::fmt::Error;
+impl<W: core::fmt::Write> Open for WrapFmt<W> {
+    type Error = core::fmt::Error;
 
     type W = Self;
 
@@ -18,23 +29,7 @@ impl<W: std::fmt::Write> Open for WrapFmt<W> {
     }
 
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
-        std::fmt::Write::write_fmt(&mut self.0, arg)
-    }
-}
-
-pub struct WrapIO<W>(pub W);
-
-impl<W: std::io::Write> Open for WrapIO<W> {
-    type Error = std::io::Error;
-
-    fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
-        std::io::Write::write_fmt(&mut self.0, arg)
-    }
-
-    type W = Self;
-
-    fn writer(&mut self) -> &mut Self::W {
-        self
+        core::fmt::Write::write_fmt(&mut self.0, arg)
     }
 }
 
@@ -52,32 +47,8 @@ impl<T: Open> Open for &mut T {
     }
 }
 
-pub trait CloserDynComp<W: Open> {
-    fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error>;
-}
-
-impl<W: Open> CloserDynComp<W> for Box<dyn CloserDynComp<W>> {
-    fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error> {
-        (**self).remove_from_dyn_comp(w)
-    }
-}
-
 pub trait Closer {
     fn remove_from<W: Open>(&mut self, w: W) -> Result<(), W::Error>;
-
-    fn as_boxdyn<W: Open>(self) -> Box<dyn CloserDynComp<W>>
-    where
-        Self: Sized,
-        Self: 'static,
-    {
-        Box::new(self)
-    }
-}
-
-impl<W: Open, C: Closer> CloserDynComp<W> for C {
-    fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error> {
-        self.remove_from(w)
-    }
 }
 
 pub trait Opener {
@@ -124,6 +95,16 @@ impl<W: Open> DynConstantCloser<W> {
     }
 }
 
+pub trait CloserDynComp<W: Open> {
+    fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error>;
+}
+
+impl<W: Open, C: Closer> CloserDynComp<W> for C {
+    fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error> {
+        self.remove_from(w)
+    }
+}
+
 impl<W: Open> CloserDynComp<W> for DynConstantCloser<W> {
     fn remove_from_dyn_comp(&mut self, w: &mut W) -> Result<(), W::Error> {
         (self.closer)(w)
@@ -145,7 +126,17 @@ impl<E: Closer, W: Open> Deref for WriteScope<E, W> {
 
 impl<E: CloserDynComp<W>, W: Open> Drop for WriteScope<E, W> {
     fn drop(&mut self) {
-        if !std::thread::panicking() {
+        let do_drop: bool = {
+            #[cfg(feature = "std")]
+            {
+                !std::thread::panicking()
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                true
+            }
+        };
+        if do_drop {
             self.closer.remove_from_dyn_comp(&mut self.writer).unwrap()
         }
     }
@@ -170,17 +161,6 @@ impl<C: Closer, W: Open> WriteScope<C, W> {
         closer.remove_from_dyn_comp(&mut w)?;
         Ok(w)
     }
-
-    pub fn closer_box_dyn(self) -> WriteScope<Box<dyn CloserDynComp<W>>, W>
-    where
-        C: 'static,
-    {
-        let (closer, writer) = self.deconstruct();
-        WriteScope {
-            closer: closer.as_boxdyn(),
-            writer,
-        }
-    }
 }
 
 impl<O: ConstantCloseOpener, W: Open> WriteScope<ConstantCloser<O>, W> {
@@ -193,15 +173,25 @@ impl<O: ConstantCloseOpener, W: Open> WriteScope<ConstantCloser<O>, W> {
     }
 }
 
+/// The work-horse of this crate.
+///
+/// This is a kind of hybrid between DerefMut where Target: Write,
+/// and Write itself, with added methods with default implementations to open scopes.
+/// This is done in one big traits rather than with super traits to avoid issues with the orphan rule.
 pub trait Open {
+    /// The underlying writer's type
     type W: Open<Error = Self::Error>;
 
+    /// The Error that happens when writing
     type Error: Display + fmt::Debug;
 
+    /// The underlying writer
     fn writer(&mut self) -> &mut Self::W;
 
+    /// Write-like interface allowing to be used with the [write!] macro
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error>;
 
+    /// Open a new scope, taking a reference to self
     fn ref_open<O: Opener>(
         &mut self,
         e: O,
@@ -213,6 +203,7 @@ pub trait Open {
         })
     }
 
+    /// Open a scope and pass it as argument to the provided closure, closing it at the closures end
     fn open_scope<O: Opener>(
         &mut self,
         e: O,
@@ -224,6 +215,7 @@ pub trait Open {
         Ok(())
     }
 
+    /// Open a new scope taking self by ownership
     fn open<O: Opener>(
         mut self,
         e: O,
@@ -238,6 +230,7 @@ pub trait Open {
         })
     }
 
+    /// Write the argument to the writer
     fn text(&mut self, d: impl Display) -> Result<(), <Self::W as Open>::Error> {
         write!(self.writer(), "{d}")
     }

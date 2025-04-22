@@ -1,7 +1,0 @@
-[package]
-name = "write-html"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-write-scope ={ path = "../write-scope" }

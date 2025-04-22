@@ -1,0 +1,7 @@
+[package]
+name = "write_scope_html"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+write_scope ={ version = "0.1.0", path = "../write_scope"}

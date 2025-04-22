@@ -1,12 +1,3 @@
-[package]
-name = "writehtml"
-version = "0.1.0"
-edition = "2021"
-
 [workspace]
 resolver = "2"
-members = ["write-html", "write-scope"]
-
-[dependencies]
-write-scope = { path = "write-scope" }
-write-html = { path = "write-html" }
+members = ["write_scope_html", "write_scope"]

@@ -3,20 +3,12 @@
 version = 4
 
 [[package]]
-name = "write-html"
-version = "0.1.0"
-dependencies = [
- "write-scope",
-]
-
-[[package]]
-name = "write-scope"
+name = "write_scope"
 version = "0.1.0"
 
 [[package]]
-name = "writehtml"
+name = "write_scope_html"
 version = "0.1.0"
 dependencies = [
- "write-html",
- "write-scope",
+ "write_scope",
 ]
