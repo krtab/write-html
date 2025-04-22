@@ -6,23 +6,21 @@ use std::{
     ptr,
 };
 
-struct WrapFmt<W>(W);
-
+pub struct WrapFmt<W>(W);
 
 impl<W: std::fmt::Write> Open for WrapFmt<W> {
     type Error = std::fmt::Error;
-    
+
     type W = Self;
-    
+
     fn writer(&mut self) -> &mut Self::W {
         self
     }
 
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
         std::fmt::Write::write_fmt(&mut self.0, arg)
-    }   
+    }
 }
-
 
 pub struct WrapIO<W>(pub W);
 
@@ -32,15 +30,13 @@ impl<W: std::io::Write> Open for WrapIO<W> {
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
         std::io::Write::write_fmt(&mut self.0, arg)
     }
-    
+
     type W = Self;
-    
+
     fn writer(&mut self) -> &mut Self::W {
         self
     }
 }
-
-
 
 impl<T: Open> Open for &mut T {
     type Error = T::Error;
@@ -48,9 +44,9 @@ impl<T: Open> Open for &mut T {
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
         (*self).write_fmt(arg)
     }
-    
+
     type W = T;
-    
+
     fn writer(&mut self) -> &mut Self::W {
         self
     }
@@ -161,16 +157,6 @@ impl<E: Closer, W: Open> DerefMut for WriteScope<E, W> {
     }
 }
 
-// pub struct Wrap<O>(O);
-
-// impl<O: Open> Open for Wrap<O> {
-//     type Error = <<O as Open>::W as Open>::Error;
-
-//     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
-//         self.0.writer().write_fmt(arg)
-//     }
-// }
-
 impl<C: Closer, W: Open> WriteScope<C, W> {
     fn deconstruct(self) -> (C, W) {
         let slf = ManuallyDrop::new(self);
@@ -209,9 +195,9 @@ impl<O: ConstantCloseOpener, W: Open> WriteScope<ConstantCloser<O>, W> {
 
 pub trait Open {
     type W: Open<Error = Self::Error>;
-    
+
     type Error: Display + fmt::Debug;
-    
+
     fn writer(&mut self) -> &mut Self::W;
 
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error>;
@@ -263,9 +249,9 @@ impl<E: Closer, W: Open> Open for WriteScope<E, W> {
     fn writer(&mut self) -> &mut Self::W {
         &mut self.writer
     }
-    
+
     type Error = W::Error;
-    
+
     fn write_fmt(&mut self, arg: fmt::Arguments) -> Result<(), Self::Error> {
         self.writer.write_fmt(arg)
     }
