@@ -2,6 +2,9 @@
 name = "write_scope_html"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A write_scope front-end for HTML"
+repository = "https://github.com/krtab/write-html"
 
 [dependencies]
 write_scope ={ version = "0.1.0", path = "../write_scope"}

@@ -2,6 +2,9 @@
 name = "write_scope"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A no-std able crate to handle scopes (like xml/html) that should be closed when writing, with no allocation."
+repository = "https://github.com/krtab/write-html"
 
 [dependencies]
 
